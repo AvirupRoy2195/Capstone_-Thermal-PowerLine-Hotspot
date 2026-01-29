@@ -14,10 +14,12 @@
 This capstone project implements a **production-ready, statistically rigorous** anomaly detection system for identifying thermal hotspots in power lines and transmission towers. The system combines:
 
 - **Physics-Informed Feature Engineering** (Joule's Law, Thermodynamics)
+- **Stacking Ensemble Model** (XGBoost, RandomForest, GradientBoosting)
 - **Bayesian Hyperparameter Optimization** (Optuna)
 - **Advanced Feature Selection** (VIF, Correlation Analysis)
 - **Statistical Reliability** (Bootstrap CI, Cross-Validation)
-- **Explainable AI** (Permutation Importance)
+- **Explainable AI** (LIME, SHAP)
+- **Spatial Risk Analysis** (Corridor Aggregation & Drone Planning)
 
 ---
 
@@ -32,10 +34,9 @@ This capstone project implements a **production-ready, statistically rigorous** 
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              PHYSICS-INFORMED FEATURE ENGINEERING               │
-│  • delta_T = T_max - T_ambient                                  │
-│  • load_norm_severity = ΔT / (load_factor² + ε)  [Joule's Law]  │
-│  • thermal_gradient_intensity = edge_gradient × temp_std        │
-│  • neighbor_zscore = Z-score of spatial anomaly                 │
+│  • Core: delta_T, load_norm_severity, thermal_gradient_intensity│
+│  • Advanced: relative_hotspot, neighbor_zscore, combined_severity│
+│  • 12+ Physics-derived features created                         │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
@@ -48,32 +49,32 @@ This capstone project implements a **production-ready, statistically rigorous** 
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │            BAYESIAN HYPERPARAMETER OPTIMIZATION                 │
-│  • Optuna (50 trials, TPE sampler)                              │
-│  • Optimized: n_estimators, max_depth, learning_rate,           │
-│    subsample, colsample, min_child_weight, reg_alpha/lambda     │
+│  • Optuna (50 trials, TPE sampler) for XGBoost                  │
+│  • Optimized: n_estimators, max_depth, learning_rate, etc.      │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                COST-SENSITIVE XGBOOST                           │
-│  • scale_pos_weight for class imbalance                         │
-│  • F2-Score optimization (Recall-focused)                       │
+│                STACKING ENSEMBLE MODEL                          │
+│  • Base Learners: XGBoost, RandomForest, GradientBoosting       │
+│  • Meta Learner: LogisticRegression                             │
+│  • SMOTE for Class Imbalance Handling                           │
 │  • Stratified 5-Fold Cross-Validation                           │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              THRESHOLD & CALIBRATION                            │
-│  • F2-Optimal threshold selection                               │
-│  • Probability calibration (Platt scaling)                      │
+│  • F2-Optimal threshold selection (0.1324)                      │
+│  • Probability calibration                                      │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      OUTPUT                                     │
 │  • Thermal Risk Heatmap (Anomaly Corridors)                     │
-│  • Maintenance Recommendations                                  │
-│  • Bootstrap 95% Confidence Intervals                           │
+│  • Maintenance Recommendations (Severity Levels)                │
+│  • Drone Flight Sequence Plan                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -82,12 +83,16 @@ This capstone project implements a **production-ready, statistically rigorous** 
 ## 🔬 Methodology
 
 ### 1. Physics-Informed Features
+The model uses 12+ engineered features based on thermal physics:
+
 | Feature | Formula | Physical Meaning |
 |---------|---------|------------------|
 | `delta_T` | T_max - T_ambient | Temperature rise above ambient |
 | `load_norm_severity` | ΔT / (I² + ε) | Joule's Law proxy (resistance faults) |
 | `thermal_gradient_intensity` | edge_gradient × temp_std | Heat gradient intensity |
 | `neighbor_zscore` | Z-score(delta_to_neighbors) | Spatial anomaly score |
+| `relative_hotspot` | hotspot_fraction * T_max / T_mean | Normalized hotspot severity |
+| `combined_severity` | load_norm_severity * neighbor_zscore | Multi-factor risk index |
 
 ### 2. Why F2-Score Over Accuracy?
 > In safety-critical infrastructure, **missing a hotspot (False Negative) = fire risk**. F2-Score weights Recall 2× higher than Precision, ensuring minimal missed detections.
@@ -115,7 +120,7 @@ Capstone_ThermalPowerline/
 
 ### Prerequisites
 ```bash
-pip install pandas numpy matplotlib seaborn scikit-learn xgboost optuna statsmodels openpyxl
+pip install -r requirements.txt
 ```
 
 ### Run the Notebook
@@ -127,32 +132,36 @@ jupyter notebook PIML_Thermal_Powerline_SOTA.ipynb
 
 ## 📊 Key Results
 
-| Metric | Value |
-|--------|-------|
-| **Recall** | See notebook |
-| **F2-Score** | See notebook |
-| **ROC-AUC** | See notebook |
-| **Optimal Threshold** | F2-optimized |
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Recall** | **0.8842** | Priority metric (Fault Detection Rate) |
+| **F2-Score** | **0.8026** | Optimized objective |
+| **Precision** | 0.5862 | Trade-off for high recall |
+| **ROC-AUC** | 0.8709 | Overall discriminative power |
+| **Optimal Threshold** | 0.1324 | Selected to minimize False Negatives |
 
 ---
 
 ## 📈 Visualizations
 
-The notebook generates:
-1. **Correlation Heatmap** - Feature relationships
-2. **Optuna Optimization History** - Trial convergence
-3. **Calibration Curves** - Probability reliability
-4. **Permutation Importance** - Feature ranking
-5. **Thermal Risk Heatmap** - Spatial anomaly corridors
-6. **Confusion Matrix** - Classification performance
+The notebook generates comprehensive insights:
+1.  **Correlation Heatmap** - Feature relationships
+2.  **Optuna Optimization History** - Trial convergence
+3.  **LIME Explanations** - Local feature importance for individual tiles
+4.  **SHAP Summary** - Global feature impact
+5.  **Spatial Risk Heatmaps** - Tile-level and Zone-level risk aggregation
+6.  **Hotspot Clusters** - Identification of connected fault regions
+7.  **Drone Flight Plan** - Prioritized inspection sequence
 
 ---
 
 ## 🛠️ Technologies Used
 
 - **Python 3.8+**
-- **XGBoost** - Gradient Boosting
+- **XGBoost, GradientBoosting, RandomForest** - Ensemble Learning
 - **Optuna** - Bayesian Hyperparameter Optimization
+- **Imbalanced-learn (SMOTE)** - Handling Class Imbalance
+- **LIME & SHAP** - Explainable AI (XAI)
 - **Scikit-learn** - ML utilities
 - **Statsmodels** - VIF calculation
 - **Seaborn/Matplotlib** - Visualization
